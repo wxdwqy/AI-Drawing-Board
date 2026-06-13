@@ -2,6 +2,9 @@
 name = "ai-drawing-board"
 version = "1.0.0"
 edition = "2021"
+description = "人机协同矢量绘图板 Windows桌面版"
+authors = ["wxdwqy"]
+license = "MIT"
 
 [dependencies]
 tauri = { version = "2", features = [] }

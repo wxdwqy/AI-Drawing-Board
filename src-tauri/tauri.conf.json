@@ -19,5 +19,12 @@
         "security": {
             "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' asset: http://asset.localhost *"
         }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": [
+            "icons/icon.ico"
+        ]
     }
 }
