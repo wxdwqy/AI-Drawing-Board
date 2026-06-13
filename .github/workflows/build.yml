@@ -8,7 +8,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -20,11 +20,21 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install cargo-tauri CLI
-        run: cargo install tauri-cli
+      - name: Build release exe
+        run: cargo build --release
+        working-directory: src-tauri
 
-      - name: Build exe only (no installer)
-        run: cargo tauri build --bundles none
+      - name: Check exe exists
+        run: |
+          if (Test-Path "src-tauri/target/release/ai-drawing-board.exe") {
+            Write-Host "exe found!"
+            $size = (Get-Item "src-tauri/target/release/ai-drawing-board.exe").Length / 1MB
+            Write-Host "Size: $([math]::Round($size, 1)) MB"
+          } else {
+            Write-Host "exe NOT found"
+            dir src-tauri/target/release/*.exe
+          }
+        shell: pwsh
 
       - name: Upload exe
         uses: actions/upload-artifact@v4
