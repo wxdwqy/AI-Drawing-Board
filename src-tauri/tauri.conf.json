@@ -1,0 +1,23 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "AI绘图板",
+    "version": "1.0.0",
+    "identifier": "com.yunshu.drawing-board",
+    "build": {
+        "frontendDist": "../src"
+    },
+    "app": {
+        "windows": [
+            {
+                "title": "AI绘图板 - 人机协同矢量绘图",
+                "width": 1200,
+                "height": 800,
+                "resizable": true,
+                "fullscreen": false
+            }
+        ],
+        "security": {
+            "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' asset: http://asset.localhost *"
+        }
+    }
+}

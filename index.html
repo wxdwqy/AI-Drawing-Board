@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<!-- saved from url=(0044)http://localhost:8888/vector-drawing-v2.html -->
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人机协同矢量图绘图板 v2</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: #f5f5f5;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* ===== 顶部功能按钮区 ===== */
+        #toolbar {
+            height: 44px;
+            background: #fff;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        
+        .tool-group {
+            display: flex;
+            gap: 3px;
+            padding-right: 6px;
+            border-right: 1px solid #ddd;
+        }
+        .tool-group:last-child { border-right: none; }
+        
+        .tool-btn {
+            padding: 5px 8px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s;
+        }
+        .tool-btn:hover { background: #e8e8e8; }
+        .tool-btn.active { background: #4a90d9; color: white; border-color: #3a7bc8; }
+        
+        select.tool-select {
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+        
+        /* ===== 主体区域 ===== */
+        #main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* ===== 左侧组件区 ===== */
+        #component-panel {
+            width: 80px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            flex-shrink: 0;
+            padding: 6px;
+        }
+        
+        .comp-row {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+        
+        .comp-item {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fafafa;
+            transition: all 0.15s;
+        }
+        .comp-item:hover { background: #e8e8e8; border-color: #999; }
+        .comp-item:active { background: #d0d0d0; }
+        .comp-item svg { width: 20px; height: 20px; }
+        .custom-item {
+            width: 64px;
+            height: 40px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fafafa;
+            transition: all 0.15s;
+            margin-bottom: 4px;
+            position: relative;
+        }
+        .custom-item:hover { background: #e8e8e8; border-color: #999; }
+        .custom-item svg { width: 58px; height: 34px; }
+        .custom-delete {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            font-size: 10px;
+            line-height: 14px;
+            text-align: center;
+            cursor: pointer;
+            display: none;
+        }
+        .custom-item:hover .custom-delete { display: block; }
+        
+        /* ===== 绘图区 ===== */
+        #canvas-container {
+            flex: 1;
+            background: #e8e8e8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+        
+        #canvas {
+            width: 800px;
+            height: 600px;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.15);
+        }
+        
+        /* ===== 底部状态栏 ===== */
+        #statusbar {
+            height: 26px;
+            background: #fff;
+            border-top: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 11px;
+            color: #666;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        
+        #connection-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+        #connection-status.connected { background: #4caf50; }
+        #connection-status.disconnected { background: #f44336; }
+    </style>
+</head>
+<body>
+    <!-- 顶部功能按钮区 -->
+    <div id="toolbar">
+        <div class="tool-group">
+            <button class="tool-btn" id="btn-select" title="选择 (V)">选择</button>
+            <button class="tool-btn" id="btn-copy" title="复制">复制</button>
+            <button class="tool-btn" id="btn-paste" title="粘贴">粘贴</button>
+            <button class="tool-btn" id="btn-delete" title="删除 (Del)">删除</button>
+            <button class="tool-btn" id="btn-undo" title="撤销 (Ctrl+Z)">撤销</button>
+        </div>
+        
+        <div class="tool-group">
+            <button class="tool-btn active" data-line="thin">细</button>
+            <button class="tool-btn" data-line="medium">中</button>
+            <button class="tool-btn" data-line="thick">粗</button>
+            <button class="tool-btn" data-line="dashed">虚</button>
+        </div>
+        
+        <div class="tool-group">
+            <button class="tool-btn" id="btn-flip-h">水平镜像</button>
+            <button class="tool-btn" id="btn-flip-v">竖直镜像</button>
+        </div>
+        
+        <div class="tool-group">
+            <button class="tool-btn" id="btn-multi-select">多选</button>
+            <button class="tool-btn" id="btn-group">组合</button>
+            <button class="tool-btn" id="btn-ungroup">分解</button>
+            <button class="tool-btn" id="btn-bring-front" title="置顶">置顶</button>
+            <button class="tool-btn" id="btn-send-back" title="置底">置底</button>
+        </div>
+        
+        <div style="flex:1"></div>
+        <div class="tool-group">
+            <button class="tool-btn" id="btn-new" title="新建空白画布">新建</button>
+            <button class="tool-btn" id="btn-export" title="导出为HTML文件">导出</button>
+        </div>
+        <span style="font-size:10px; color:#999;">人机协同矢量图绘图板 v2</span>
+    </div>
+    
+    <!-- 主体区域 -->
+    <div id="main">
+        <!-- 左侧组件区 -->
+        <div id="component-panel">
+            <!-- 点 -->
+            <div class="comp-row">
+                <div class="comp-item" data-type="dot" title="圆点">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="currentColor"></circle></svg>
+                </div>
+                <div class="comp-item" data-type="cross" title="十字星">
+                    <svg viewBox="0 0 24 24"><line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" stroke-width="2"></line><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2"></line></svg>
+                </div>
+            </div>
+            
+            <!-- 线 -->
+            <div class="comp-row">
+                <div class="comp-item" data-type="line" title="直线">
+                    <svg viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="2"></line></svg>
+                </div>
+                <div class="comp-item" data-type="arrow" title="有向直线">
+                    <svg viewBox="0 0 24 24"><line x1="3" y1="20" x2="17" y2="6" stroke="currentColor" stroke-width="2"></line><polygon points="21,3 13,7 17,6 20,11" fill="currentColor"></polygon></svg>
+                </div>
+            </div>
+            
+            <!-- 四边形 -->
+            <div class="comp-row">
+                <div class="comp-item" data-type="rect" title="矩形">
+                    <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" fill="none" stroke="currentColor" stroke-width="2"></rect></svg>
+                </div>
+                <div class="comp-item" data-type="parallelogram" title="平行四边形">
+                    <svg viewBox="0 0 24 24"><polygon points="8,6 20,6 16,18 4,18" fill="none" stroke="currentColor" stroke-width="2"></polygon></svg>
+                </div>
+            </div>
+            
+            <!-- 三角形 -->
+            <div class="comp-row">
+                <div class="comp-item" data-type="right-triangle" title="直角三角形">
+                    <svg viewBox="0 0 24 24"><polygon points="4,18 20,18 4,6" fill="none" stroke="currentColor" stroke-width="2"></polygon></svg>
+                </div>
+                <div class="comp-item" data-type="isosceles-triangle" title="等腰三角形">
+                    <svg viewBox="0 0 24 24"><polygon points="12,4 20,18 4,18" fill="none" stroke="currentColor" stroke-width="2"></polygon></svg>
+                </div>
+            </div>
+            
+            <!-- 曲线 -->
+            <div class="comp-row">
+                <div class="comp-item" data-type="circle" title="圆">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle></svg>
+                </div>
+                <div class="comp-item" data-type="parabola" title="抛物线">
+                    <svg viewBox="0 0 24 24"><path d="M3,5 Q12,22 21,5" fill="none" stroke="currentColor" stroke-width="2"></path></svg>
+                </div>
+            </div>
+            
+            <!-- 特殊曲线 -->
+            <div class="comp-row">
+                <div class="comp-item" data-type="arc" title="四分之一圆弧">
+                    <svg viewBox="0 0 24 24"><path d="M4,20 A16,16 0 0,1 20,4" fill="none" stroke="currentColor" stroke-width="2"></path><line x1="4" y1="20" x2="4" y2="4" stroke="currentColor" stroke-width="1" stroke-dasharray="2,2"></line><line x1="4" y1="20" x2="20" y2="20" stroke="currentColor" stroke-width="1" stroke-dasharray="2,2"></line></svg>
+                </div>
+                <div class="comp-item" data-type="wave" title="波浪线">
+                    <svg viewBox="0 0 24 24"><path d="M2,12 Q6,6 10,12 T18,12" fill="none" stroke="currentColor" stroke-width="2"></path></svg>
+                </div>
+            </div>
+            
+            <!-- 文本 + 自定义 -->
+            <div class="comp-row">
+                <div class="comp-item" data-type="text" title="文本">
+                    <svg viewBox="0 0 24 24"><text x="12" y="17" text-anchor="middle" font-size="14" fill="currentColor">T</text></svg>
+                </div>
+                <div id="btn-save-custom" title="收藏选中图形" style="cursor:pointer; width:32px; height:32px; border:1px solid #ddd; border-radius:4px; display:flex; align-items:center; justify-content:center; background:#fafafa;">
+                    <svg viewBox="0 0 24 24"><path d="M12 2 L15 9 L22 9 L16.5 14 L18.5 21 L12 17 L5.5 21 L7.5 14 L2 9 L9 9 Z" fill="none" stroke="currentColor" stroke-width="1.5"></path></svg>
+                </div>
+            </div>
+            
+            <!-- 自定义组件区 -->
+            <div style="border-top:1px solid #ddd; margin-top:6px; padding-top:6px;">
+                <div style="font-size:10px; color:#999; margin-bottom:4px;">收藏</div>
+                <div id="custom-components"></div>
+            </div>
+        </div>
+        
+        <!-- 绘图区 -->
+        <div id="canvas-container">
+            <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+                <!-- 坐标系网格 -->
+                <g id="grid"><line x1="0" y1="0" x2="0" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="50" y1="0" x2="50" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="100" y1="0" x2="100" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="150" y1="0" x2="150" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="200" y1="0" x2="200" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="250" y1="0" x2="250" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="300" y1="0" x2="300" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="350" y1="0" x2="350" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="400" y1="0" x2="400" y2="600" stroke="#999" stroke-width="1.5"></line><line x1="450" y1="0" x2="450" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="500" y1="0" x2="500" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="550" y1="0" x2="550" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="600" y1="0" x2="600" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="650" y1="0" x2="650" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="700" y1="0" x2="700" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="750" y1="0" x2="750" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="800" y1="0" x2="800" y2="600" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="0" x2="800" y2="0" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="50" x2="800" y2="50" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="100" x2="800" y2="100" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="150" x2="800" y2="150" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="200" x2="800" y2="200" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="250" x2="800" y2="250" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="300" x2="800" y2="300" stroke="#999" stroke-width="1.5"></line><line x1="0" y1="350" x2="800" y2="350" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="400" x2="800" y2="400" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="450" x2="800" y2="450" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="500" x2="800" y2="500" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="550" x2="800" y2="550" stroke="#e8e8e8" stroke-width="1"></line><line x1="0" y1="600" x2="800" y2="600" stroke="#e8e8e8" stroke-width="1"></line><text x="0" y="314" text-anchor="middle" font-size="10" fill="#aaa">-8</text><text x="50" y="314" text-anchor="middle" font-size="10" fill="#aaa">-7</text><text x="100" y="314" text-anchor="middle" font-size="10" fill="#aaa">-6</text><text x="150" y="314" text-anchor="middle" font-size="10" fill="#aaa">-5</text><text x="200" y="314" text-anchor="middle" font-size="10" fill="#aaa">-4</text><text x="250" y="314" text-anchor="middle" font-size="10" fill="#aaa">-3</text><text x="300" y="314" text-anchor="middle" font-size="10" fill="#aaa">-2</text><text x="350" y="314" text-anchor="middle" font-size="10" fill="#aaa">-1</text><text x="450" y="314" text-anchor="middle" font-size="10" fill="#aaa">1</text><text x="500" y="314" text-anchor="middle" font-size="10" fill="#aaa">2</text><text x="550" y="314" text-anchor="middle" font-size="10" fill="#aaa">3</text><text x="600" y="314" text-anchor="middle" font-size="10" fill="#aaa">4</text><text x="650" y="314" text-anchor="middle" font-size="10" fill="#aaa">5</text><text x="700" y="314" text-anchor="middle" font-size="10" fill="#aaa">6</text><text x="750" y="314" text-anchor="middle" font-size="10" fill="#aaa">7</text><text x="800" y="314" text-anchor="middle" font-size="10" fill="#aaa">8</text><text x="386" y="604" text-anchor="middle" font-size="10" fill="#aaa">-6</text><text x="386" y="554" text-anchor="middle" font-size="10" fill="#aaa">-5</text><text x="386" y="504" text-anchor="middle" font-size="10" fill="#aaa">-4</text><text x="386" y="454" text-anchor="middle" font-size="10" fill="#aaa">-3</text><text x="386" y="404" text-anchor="middle" font-size="10" fill="#aaa">-2</text><text x="386" y="354" text-anchor="middle" font-size="10" fill="#aaa">-1</text><text x="386" y="254" text-anchor="middle" font-size="10" fill="#aaa">1</text><text x="386" y="204" text-anchor="middle" font-size="10" fill="#aaa">2</text><text x="386" y="154" text-anchor="middle" font-size="10" fill="#aaa">3</text><text x="386" y="104" text-anchor="middle" font-size="10" fill="#aaa">4</text><text x="386" y="54" text-anchor="middle" font-size="10" fill="#aaa">5</text><text x="386" y="4" text-anchor="middle" font-size="10" fill="#aaa">6</text></g>
+                <!-- 形状层 -->
+                <g id="shapes-layer"><g data-id="shape_3"><circle cx="266" cy="193" r="10" style="fill:#000000; stroke:#000000; stroke-width:2; opacity:1; " transform=""></circle></g><g data-id="shape_5"><ellipse cx="380" cy="288" rx="50" ry="50" style="fill:none; stroke:#000000; stroke-width:2; opacity:1; " transform=""></ellipse></g><g data-id="shape_1"><ellipse cx="364" cy="285" rx="194" ry="205" style="fill:none; stroke:#000000; stroke-width:2; opacity:1; " transform=""></ellipse></g></g>
+                <!-- 选中状态层 -->
+                <g id="selection-layer"></g>
+            </svg>
+        </div>
+    </div>
+    
+    <!-- 底部状态栏 -->
+    <div id="statusbar">
+        <div id="connection-status" class="connected"></div>
+        <span id="status-coord">坐标: 7.8, 3.8</span>
+        <span id="status-objects">对象: 3</span>
+        <span id="status-selected">未选中</span>
+        <div style="flex:1"></div>
+    </div>
+    
+    <script>
+        // ===== 全局状态 =====
+        const state = {
+            tool: 'select',
+            shapes: [],
+            selectedIds: [],
+            clipboard: [],
+            shapeCounter: 0,
+            lineWeight: 2,
+            isDragging: false,
+            isResizing: false,
+            isRotating: false,
+            dragStart: { x: 0, y: 0 },
+            dragOffset: { x: 0, y: 0 },
+            resizeHandle: null,
+            multiSelectMode: false,
+            isMarquee: false,
+            marqueeStart: null,
+            marqueeEnd: null,
+            gridSize: 50, // 50px = 1坐标单位
+            canvasWidth: 800,
+            canvasHeight: 600,
+            originX: 400,
+            originY: 300
+        };
+        
+        // ===== DOM元素 =====
+        const canvas = document.getElementById('canvas');
+        const shapesLayer = document.getElementById('shapes-layer');
+        const selectionLayer = document.getElementById('selection-layer');
+        const gridLayer = document.getElementById('grid');
+        
+        // ===== 坐标系网格 =====
+        function drawGrid() {
+            gridLayer.innerHTML = '';
+            
+            // 浅灰背景网格
+            for (let x = 0; x <= state.canvasWidth; x += state.gridSize) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x);
+                line.setAttribute('y1', 0);
+                line.setAttribute('x2', x);
+                line.setAttribute('y2', state.canvasHeight);
+                line.setAttribute('stroke', x === state.originX ? '#999' : '#e8e8e8');
+                line.setAttribute('stroke-width', x === state.originX ? '1.5' : '1');
+                gridLayer.appendChild(line);
+            }
+            
+            for (let y = 0; y <= state.canvasHeight; y += state.gridSize) {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', 0);
+                line.setAttribute('y1', y);
+                line.setAttribute('x2', state.canvasWidth);
+                line.setAttribute('y2', y);
+                line.setAttribute('stroke', y === state.originY ? '#999' : '#e8e8e8');
+                line.setAttribute('stroke-width', y === state.originY ? '1.5' : '1');
+                gridLayer.appendChild(line);
+            }
+            
+            // 坐标标签
+            for (let i = -8; i <= 8; i++) {
+                if (i === 0) continue;
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', state.originX + i * state.gridSize);
+                text.setAttribute('y', state.originY + 14);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '10');
+                text.setAttribute('fill', '#aaa');
+                text.textContent = i;
+                gridLayer.appendChild(text);
+            }
+            
+            for (let i = -6; i <= 6; i++) {
+                if (i === 0) continue;
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', state.originX - 14);
+                text.setAttribute('y', state.originY - i * state.gridSize + 4);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '10');
+                text.setAttribute('fill', '#aaa');
+                text.textContent = i;
+                gridLayer.appendChild(text);
+            }
+        }
+        
+        // ===== 形状类 =====
+        class Shape {
+            constructor(type, x, y, options = {}) {
+                this.id = options.id || 'shape_' + (++state.shapeCounter);
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.width = options.width || 100;
+                this.height = options.height || 100;
+                this.rotation = options.rotation || 0;
+                // dot类型默认黑色填充（实心点），其他类型默认无填充
+                this.fill = options.fill || (type === 'dot' ? '#000000' : 'none');
+                this.stroke = options.stroke || '#000000';
+                this.strokeWidth = options.strokeWidth || state.lineWeight;
+                this.flipH = options.flipH || false;
+                this.flipV = options.flipV || false;
+                this.opacity = options.opacity || 1;
+                this.text = options.text || '';
+                this.strokeDasharray = options.strokeDasharray || '';
+                this.groupId = options.groupId || null; // 组合ID
+            }
+            
+            toSVG() {
+                const transform = this.getTransform();
+                const dash = this.strokeDasharray ? `stroke-dasharray:${this.strokeDasharray};` : '';
+                const style = `fill:${this.fill}; stroke:${this.stroke}; stroke-width:${this.strokeWidth}; opacity:${this.opacity}; ${dash}`;
+                
+                switch (this.type) {
+                    case 'dot':
+                        return `<circle cx="${this.x}" cy="${this.y}" r="${this.width/2}" style="${style}" transform="${transform}"/>`;
+                    case 'cross':
+                        return `<g transform="${transform}">
+                            <line x1="${this.x}" y1="${this.y-this.height/2}" x2="${this.x}" y2="${this.y+this.height/2}" style="stroke:${this.stroke};stroke-width:${this.strokeWidth}"/>
+                            <line x1="${this.x-this.width/2}" y1="${this.y}" x2="${this.x+this.width/2}" y2="${this.y}" style="stroke:${this.stroke};stroke-width:${this.strokeWidth}"/>
+                        </g>`;
+                    case 'line':
+                        return `<line x1="${this.x-this.width/2}" y1="${this.y}" x2="${this.x+this.width/2}" y2="${this.y}" style="${style}" transform="${transform}"/>`;
+                    case 'arrow':
+                        return `<g transform="${transform}">
+                            <line x1="${this.x-this.width/2}" y1="${this.y}" x2="${this.x+this.width/2-10}" y2="${this.y}" style="stroke:${this.stroke};stroke-width:${this.strokeWidth}"/>
+                            <polygon points="${this.x+this.width/2-10},${this.y-6} ${this.x+this.width/2},${this.y} ${this.x+this.width/2-10},${this.y+6}" fill="${this.stroke}"/>
+                        </g>`;
+                    case 'rect':
+                        return `<rect x="${this.x-this.width/2}" y="${this.y-this.height/2}" width="${this.width}" height="${this.height}" style="${style}" transform="${transform}"/>`;
+                    case 'parallelogram':
+                        const off = this.width * 0.2;
+                        return `<polygon points="${this.x-this.width/2+off},${this.y-this.height/2} ${this.x+this.width/2+off},${this.y-this.height/2} ${this.x+this.width/2-off},${this.y+this.height/2} ${this.x-this.width/2-off},${this.y+this.height/2}" style="${style}" transform="${transform}"/>`;
+                    case 'right-triangle':
+                        return `<polygon points="${this.x-this.width/2},${this.y+this.height/2} ${this.x+this.width/2},${this.y+this.height/2} ${this.x-this.width/2},${this.y-this.height/2}" style="${style}" transform="${transform}"/>`;
+                    case 'isosceles-triangle':
+                        return `<polygon points="${this.x},${this.y-this.height/2} ${this.x+this.width/2},${this.y+this.height/2} ${this.x-this.width/2},${this.y+this.height/2}" style="${style}" transform="${transform}"/>`;
+                    case 'circle':
+                        return `<ellipse cx="${this.x}" cy="${this.y}" rx="${this.width/2}" ry="${this.height/2}" style="${style}" transform="${transform}"/>`;
+                    case 'parabola':
+                        return `<path d="M${this.x-this.width/2},${this.y+this.height/2} Q${this.x},${this.y-this.height/2} ${this.x+this.width/2},${this.y+this.height/2}" style="${style}" transform="${transform}"/>`;
+                    case 'arc':
+                        const r = this.width / 2;
+                        return `<path d="M${this.x+r},${this.y} A${r},${r} 0 0,1 ${this.x},${this.y+r}" style="${style}" transform="${transform}"/>`;
+                    case 'wave':
+                        // 5个完整波形
+                        const w5 = this.width / 5;
+                        const h5 = this.height / 2;
+                        const startX = this.x - this.width/2;
+                        const cy = this.y;
+                        return `<path d="M${startX},${cy} q${w5/2},${-h5} ${w5},0 q${w5/2},${h5} ${w5},0 q${w5/2},${-h5} ${w5},0 q${w5/2},${h5} ${w5},0 q${w5/2},${-h5} ${w5},0 q${w5/2},${h5} ${w5},0 q${w5/2},${-h5} ${w5},0 q${w5/2},${h5} ${w5},0 q${w5/2},${-h5} ${w5},0 q${w5/2},${h5} ${w5},0" style="${style}" transform="${transform}"/>`;
+                    case 'text':
+                        return `<text x="${this.x}" y="${this.y}" text-anchor="middle" dominant-baseline="middle" font-size="${this.height}" style="fill:${this.stroke};" transform="${transform}">${this.text}</text>`;
+                    default:
+                        return '';
+                }
+            }
+            
+            getTransform() {
+                let t = '';
+                if (this.flipH || this.flipV) {
+                    t = `translate(${this.x}, ${this.y}) scale(${this.flipH ? -1 : 1}, ${this.flipV ? -1 : 1}) translate(${-this.x}, ${-this.y}) `;
+                }
+                if (this.rotation !== 0) {
+                    t += `rotate(${this.rotation}, ${this.x}, ${this.y})`;
+                }
+                return t;
+            }
+            
+            containsPoint(px, py) {
+                return Math.abs(px - this.x) <= this.width/2 + 5 && 
+                       Math.abs(py - this.y) <= this.height/2 + 5;
+            }
+        }
+        
+        // ===== 渲染 =====
+        function render() {
+            shapesLayer.innerHTML = '';
+            state.shapes.forEach(shape => {
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.innerHTML = shape.toSVG();
+                g.setAttribute('data-id', shape.id);
+                shapesLayer.appendChild(g);
+            });
+            renderSelection();
+            updateStatusBar();
+            sendUpdate();
+        }
+        
+        function renderSelection() {
+            selectionLayer.innerHTML = '';
+            state.selectedIds.forEach(id => {
+                const shape = getShapeById(id);
+                if (!shape) return;
+                
+                // 选中框
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', shape.x - shape.width/2 - 5);
+                rect.setAttribute('y', shape.y - shape.height/2 - 5);
+                rect.setAttribute('width', shape.width + 10);
+                rect.setAttribute('height', shape.height + 10);
+                rect.setAttribute('fill', 'none');
+                rect.setAttribute('stroke', '#4a90d9');
+                rect.setAttribute('stroke-width', '1');
+                rect.setAttribute('stroke-dasharray', '5,3');
+                rect.setAttribute('transform', `rotate(${shape.rotation}, ${shape.x}, ${shape.y})`);
+                selectionLayer.appendChild(rect);
+                
+                // 四角手柄
+                const corners = [
+                    { x: shape.x - shape.width/2, y: shape.y - shape.height/2, pos: 'nw' },
+                    { x: shape.x + shape.width/2, y: shape.y - shape.height/2, pos: 'ne' },
+                    { x: shape.x + shape.width/2, y: shape.y + shape.height/2, pos: 'se' },
+                    { x: shape.x - shape.width/2, y: shape.y + shape.height/2, pos: 'sw' }
+                ];
+                corners.forEach(c => {
+                    const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    handle.setAttribute('x', c.x - 4);
+                    handle.setAttribute('y', c.y - 4);
+                    handle.setAttribute('width', 8);
+                    handle.setAttribute('height', 8);
+                    handle.setAttribute('fill', 'white');
+                    handle.setAttribute('stroke', '#4a90d9');
+                    handle.setAttribute('stroke-width', '2');
+                    handle.setAttribute('data-handle', c.pos);
+                    handle.style.cursor = c.pos + '-resize';
+                    selectionLayer.appendChild(handle);
+                });
+                
+                // 旋转手柄
+                const rh = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                rh.setAttribute('cx', shape.x);
+                rh.setAttribute('cy', shape.y - shape.height/2 - 18);
+                rh.setAttribute('r', 5);
+                rh.setAttribute('fill', '#ff6b6b');
+                rh.setAttribute('stroke', '#cc5555');
+                rh.setAttribute('data-handle', 'rotate');
+                rh.style.cursor = 'grab';
+                selectionLayer.appendChild(rh);
+            });
+        }
+        
+        // ===== 辅助函数 =====
+        function getShapeById(id) { return state.shapes.find(s => s.id === id); }
+        
+        function getShapeAtPoint(x, y) {
+            for (let i = state.shapes.length - 1; i >= 0; i--) {
+                if (state.shapes[i].containsPoint(x, y)) return state.shapes[i];
+            }
+            return null;
+        }
+        
+        // 获取组合中的所有图形
+        function getGroupShapes(groupId) {
+            return state.shapes.filter(s => s.groupId === groupId);
+        }
+        
+        // 选中组合
+        function selectGroup(groupId) {
+            state.selectedIds = state.shapes.filter(s => s.groupId === groupId).map(s => s.id);
+        }
+        
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+        
+        function screenToCoord(x, y) {
+            return {
+                x: ((x - state.originX) / state.gridSize).toFixed(1),
+                y: (-(y - state.originY) / state.gridSize).toFixed(1)
+            };
+        }
+        
+        // 撤销系统：记录操作历史
+        const actionHistory = [];
+        
+        function recordAction(action) {
+            actionHistory.push(action);
+            if (actionHistory.length > 20) actionHistory.shift();
+        }
+        
+        function undo() {
+            if (actionHistory.length === 0) return;
+            const action = actionHistory.pop();
+            
+            switch(action.type) {
+                case 'add':
+                    state.shapes = state.shapes.filter(s => s.id !== action.shapeId);
+                    break;
+                case 'delete':
+                    state.shapes.push(action.shapeData);
+                    break;
+                case 'modify':
+                    const shape = state.shapes.find(s => s.id === action.shapeId);
+                    if (shape) Object.assign(shape, action.oldValues);
+                    break;
+                case 'group':
+                    // 恢复每个图形的groupId
+                    Object.entries(action.oldValues).forEach(([id, vals]) => {
+                        const s = state.shapes.find(sh => sh.id === id);
+                        if (s) Object.assign(s, vals);
+                    });
+                    break;
+            }
+            
+            state.selectedIds = [];
+            render();
+        }
+        
+        // 在添加图形时记录
+        function recordAdd(shapeId) {
+            recordAction({ type: 'add', shapeId: shapeId });
+        }
+        
+        // 在删除图形时记录
+        function recordDelete(shapeData) {
+            recordAction({ type: 'delete', shapeData: shapeData });
+        }
+        
+        // 在修改图形时记录
+        function recordModify(shapeId, oldValues) {
+            recordAction({ type: 'modify', shapeId: shapeId, oldValues: oldValues });
+        }
+        
+        function updateStatusBar() {
+            document.getElementById('status-objects').textContent = `对象: ${state.shapes.length}`;
+            if (state.selectedIds.length > 0) {
+                const firstShape = getShapeById(state.selectedIds[0]);
+                if (firstShape && firstShape.groupId) {
+                    document.getElementById('status-selected').textContent = 
+                        `已选中组合 (${state.selectedIds.length}个)`;
+                } else {
+                    document.getElementById('status-selected').textContent = 
+                        `已选中 ${state.selectedIds.length} 个`;
+                }
+            } else {
+                document.getElementById('status-selected').textContent = '未选中';
+            }
+        }
+        
+        // 拖动前快照（用于撤销）
+        let dragSnapshot = null;
+        
+        function saveDragSnapshot() {
+            dragSnapshot = state.selectedIds.map(id => {
+                const s = getShapeById(id);
+                return s ? { id: s.id, x: s.x, y: s.y, width: s.width, height: s.height, rotation: s.rotation } : null;
+            }).filter(Boolean);
+        }
+        
+        function recordDragAction() {
+            if (!dragSnapshot || dragSnapshot.length === 0) return;
+            dragSnapshot.forEach(snap => {
+                const shape = getShapeById(snap.id);
+                if (shape && (shape.x !== snap.x || shape.y !== snap.y || shape.width !== snap.width || shape.height !== snap.height || shape.rotation !== snap.rotation)) {
+                    recordModify(snap.id, { x: snap.x, y: snap.y, width: snap.width, height: snap.height, rotation: snap.rotation });
+                }
+            });
+            dragSnapshot = null;
+        }
+        
+        // ===== 绘图区事件 =====
+        canvas.addEventListener('mousedown', (e) => {
+            const pos = getMousePos(e);
+            
+            // 检查手柄点击
+            const handle = e.target.getAttribute('data-handle');
+            if (handle && state.selectedIds.length > 0) {
+                saveDragSnapshot(); // 记录操作前的状态
+                if (handle === 'rotate') {
+                    state.isRotating = true;
+                } else {
+                    state.isResizing = true;
+                    state.resizeHandle = handle;
+                }
+                state.dragStart = pos;
+                return;
+            }
+            
+            if (state.tool === 'select') {
+                const shape = getShapeAtPoint(pos.x, pos.y);
+                if (shape) {
+                    // 1. 先确定要选中哪些图形
+                    if (shape.groupId) {
+                        // 点击组合中的图形 -> 选中整个组合
+                        selectGroup(shape.groupId);
+                    } else if (e.ctrlKey || e.metaKey || state.multiSelectMode) {
+                        // Ctrl/Command+点击 或 多选模式 -> 切换选中状态
+                        const idx = state.selectedIds.indexOf(shape.id);
+                        if (idx >= 0) state.selectedIds.splice(idx, 1);
+                        else state.selectedIds.push(shape.id);
+                    } else {
+                        // 普通模式 -> 只选中当前图形
+                        state.selectedIds = [shape.id];
+                    }
+                    
+                    // 2. 记录拖动前状态
+                    saveDragSnapshot();
+                    state.isDragging = true;
+                    state.dragStart = pos;
+                    
+                    // 3. 记录所有选中图形的原始位置（保持相对位置）
+                    console.log('mousedown - selectedIds:', state.selectedIds);
+                    state.selectedIds.forEach(sid => {
+                        const s = getShapeById(sid);
+                        if (s) {
+                            s._dragOrig = { x: s.x, y: s.y };
+                            console.log('set _dragOrig for', sid, 'at', s.x, s.y);
+                        }
+                    });
+                } else {
+                    // 点击空白处 -> 开始框选
+                    state.isMarquee = true;
+                    state.marqueeStart = pos;
+                    state.marqueeEnd = pos;
+                }
+                render();
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const pos = getMousePos(e);
+            const coord = screenToCoord(pos.x, pos.y);
+            document.getElementById('status-coord').textContent = `坐标: ${coord.x}, ${coord.y}`;
+            
+            if (state.isDragging && state.selectedIds.length > 0) {
+                const dx = pos.x - state.dragStart.x;
+                const dy = pos.y - state.dragStart.y;
+                console.log('mousemove - dx:', dx, 'dy:', dy, 'selectedIds:', state.selectedIds);
+                state.selectedIds.forEach(id => {
+                    const shape = getShapeById(id);
+                    if (shape && shape._dragOrig) {
+                        shape.x = shape._dragOrig.x + dx;
+                        shape.y = shape._dragOrig.y + dy;
+                        console.log('moved', id, 'to', shape.x, shape.y);
+                    } else {
+                        console.log('SKIP', id, 'no _dragOrig');
+                    }
+                });
+                render();
+            }
+            // 框选
+            if (state.isMarquee) {
+                state.marqueeEnd = pos;
+                render();
+                // 绘制框选虚线矩形
+                const sx = Math.min(state.marqueeStart.x, pos.x);
+                const sy = Math.min(state.marqueeStart.y, pos.y);
+                const sw = Math.abs(pos.x - state.marqueeStart.x);
+                const sh = Math.abs(pos.y - state.marqueeStart.y);
+                if (sw > 2 || sh > 2) {
+                    const marqueeRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    marqueeRect.setAttribute('x', sx);
+                    marqueeRect.setAttribute('y', sy);
+                    marqueeRect.setAttribute('width', sw);
+                    marqueeRect.setAttribute('height', sh);
+                    marqueeRect.setAttribute('fill', 'rgba(74, 144, 217, 0.1)');
+                    marqueeRect.setAttribute('stroke', '#4a90d9');
+                    marqueeRect.setAttribute('stroke-width', '1');
+                    marqueeRect.setAttribute('stroke-dasharray', '4,4');
+                    selectionLayer.appendChild(marqueeRect);
+                }
+            }
+            
+            if (state.isResizing && state.selectedIds.length === 1) {
+                const shape = getShapeById(state.selectedIds[0]);
+                if (shape) {
+                    const dx = pos.x - state.dragStart.x;
+                    const dy = pos.y - state.dragStart.y;
+                    
+                    switch (state.resizeHandle) {
+                        case 'se': shape.width = Math.max(20, shape.width + dx); shape.height = Math.max(20, shape.height + dy); break;
+                        case 'nw': shape.width = Math.max(20, shape.width - dx); shape.height = Math.max(20, shape.height - dy); break;
+                        case 'ne': shape.width = Math.max(20, shape.width + dx); shape.height = Math.max(20, shape.height - dy); break;
+                        case 'sw': shape.width = Math.max(20, shape.width - dx); shape.height = Math.max(20, shape.height + dy); break;
+                    }
+                    state.dragStart = pos;
+                    render();
+                }
+            }
+            
+            if (state.isRotating && state.selectedIds.length === 1) {
+                const shape = getShapeById(state.selectedIds[0]);
+                if (shape) {
+                    const angle = Math.atan2(pos.y - shape.y, pos.x - shape.x);
+                    shape.rotation = Math.round((angle * 180 / Math.PI) + 90);
+                    render();
+                }
+            }
+        });
+        
+        canvas.addEventListener('mouseup', (e) => {
+            // 框选完成
+            if (state.isMarquee) {
+                const sx = Math.min(state.marqueeStart.x, state.marqueeEnd.x);
+                const sy = Math.min(state.marqueeStart.y, state.marqueeEnd.y);
+                const sw = Math.abs(state.marqueeEnd.x - state.marqueeStart.x);
+                const sh = Math.abs(state.marqueeEnd.y - state.marqueeStart.y);
+                
+                // 只有拖动了足够距离才进行框选
+                if (sw > 5 || sh > 5) {
+                    // Ctrl/多选模式 -> 追加；否则替换
+                    const isAppend = e && (e.ctrlKey || e.metaKey || state.multiSelectMode);
+                    if (!isAppend) {
+                        state.selectedIds = [];
+                    }
+                    state.shapes.forEach(shape => {
+                        // 相交检测：图形边界框和框选矩形有重叠即选中
+                        const shapeLeft = shape.x - shape.width / 2;
+                        const shapeTop = shape.y - shape.height / 2;
+                        const shapeRight = shape.x + shape.width / 2;
+                        const shapeBottom = shape.y + shape.height / 2;
+                        if (shapeRight >= sx && shapeLeft <= sx + sw &&
+                            shapeBottom >= sy && shapeTop <= sy + sh) {
+                            if (state.selectedIds.indexOf(shape.id) === -1) {
+                                state.selectedIds.push(shape.id);
+                            }
+                        }
+                    });
+                }
+                
+                state.isMarquee = false;
+                state.marqueeStart = null;
+                state.marqueeEnd = null;
+                render();
+            }
+            
+            if (state.isDragging || state.isResizing || state.isRotating) {
+                recordDragAction();
+            }
+            state.isDragging = false;
+            state.isResizing = false;
+            state.isRotating = false;
+            state.resizeHandle = null;
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            state.isDragging = false;
+            state.isResizing = false;
+            state.isRotating = false;
+            state.resizeHandle = null;
+        });
+        
+        // ===== 组件区事件 =====
+        document.querySelectorAll('.comp-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const type = item.dataset.type;
+                let text = '';
+                
+                if (type === 'text') {
+                    text = prompt('请输入文本:', 'ABC');
+                    if (!text) return;
+                }
+                
+                // 创建形状在画布中心，不同类型有不同的默认大小
+                let defaultSize = 100;
+                if (type === 'dot' || type === 'cross') {
+                    defaultSize = 30; // 点和十字星小一些
+                }
+                const shape = new Shape(type, state.originX, state.originY, {
+                    width: defaultSize,
+                    height: defaultSize,
+                    text: text
+                });
+                state.shapes.push(shape);
+                state.selectedIds = [shape.id];
+                state.tool = 'select';
+                document.getElementById('btn-select').classList.add('active');
+                render();
+                recordAdd(shape.id);
+                sendUpdate();
+            });
+        });
+        
+        // ===== 功能按钮事件 =====
+        document.getElementById('btn-select').addEventListener('click', () => {
+            state.tool = 'select';
+            state.multiSelectMode = false;
+            document.getElementById('btn-multi-select').classList.remove('active');
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-select').classList.add('active');
+        });
+        
+        document.getElementById('btn-copy').addEventListener('click', () => {
+            state.clipboard = state.selectedIds.map(id => {
+                const s = getShapeById(id);
+                return s ? JSON.parse(JSON.stringify(s)) : null;
+            }).filter(Boolean);
+        });
+        
+        document.getElementById('btn-paste').addEventListener('click', () => {
+            state.selectedIds = [];
+            state.clipboard.forEach(d => {
+                const shape = new Shape(d.type, d.x + 20, d.y + 20, d);
+                shape.id = 'shape_' + (++state.shapeCounter);
+                state.shapes.push(shape);
+                state.selectedIds.push(shape.id);
+                recordAdd(shape.id);
+            });
+            render();
+        });
+        
+        document.getElementById('btn-delete').addEventListener('click', () => {
+            if (state.selectedIds.length === 0) return;
+            // 记录要删除的图形
+            state.selectedIds.forEach(id => {
+                const shape = state.shapes.find(s => s.id === id);
+                if (shape) recordDelete(JSON.parse(JSON.stringify(shape)));
+            });
+            state.shapes = state.shapes.filter(s => !state.selectedIds.includes(s.id));
+            state.selectedIds = [];
+            render();
+        });
+        
+        document.getElementById('btn-undo').addEventListener('click', undo);
+        
+        document.querySelectorAll('[data-line]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const line = btn.dataset.line;
+                const widths = { thin: 1, medium: 2, thick: 4, dashed: 2 };
+                const dashes = { thin: '', medium: '', thick: '', dashed: '5,3' };
+                state.lineWeight = widths[line];
+                document.querySelectorAll('[data-line]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.selectedIds.forEach(id => {
+                    const s = getShapeById(id);
+                    if (s) {
+                        s.strokeWidth = state.lineWeight;
+                        s.strokeDasharray = dashes[line];
+                    }
+                });
+                render();
+            });
+        });
+        
+        document.getElementById('btn-flip-h').addEventListener('click', () => {
+            state.selectedIds.forEach(id => { 
+                const s = getShapeById(id); 
+                if (s) { 
+                    recordModify(id, {flipH: s.flipH});
+                    s.flipH = !s.flipH; 
+                }
+            });
+            render();
+        });
+        
+        document.getElementById('btn-flip-v').addEventListener('click', () => {
+            state.selectedIds.forEach(id => { 
+                const s = getShapeById(id); 
+                if (s) { 
+                    recordModify(id, {flipV: s.flipV});
+                    s.flipV = !s.flipV; 
+                }
+            });
+            render();
+        });
+        
+        document.getElementById('btn-multi-select').addEventListener('click', () => {
+            state.multiSelectMode = !state.multiSelectMode;
+            document.getElementById('btn-multi-select').classList.toggle('active', state.multiSelectMode);
+            // 多选模式下，选择按钮不显示active
+            if (state.multiSelectMode) {
+                document.getElementById('btn-select').classList.remove('active');
+            }
+        });
+        
+        // 组合功能
+        document.getElementById('btn-group').addEventListener('click', () => {
+            if (state.selectedIds.length < 2) {
+                alert('请先多选至少2个图形再组合');
+                return;
+            }
+            // 生成一个共同的groupId，所有选中图形共享
+            const commonGroupId = 'group_' + (++state.shapeCounter);
+            const oldValues = {};
+            state.selectedIds.forEach(id => {
+                const s = getShapeById(id);
+                if (s) { 
+                    oldValues[id] = { groupId: s.groupId }; 
+                    s.groupId = commonGroupId;  // 所有图形用同一个groupId
+                }
+            });
+            render();
+            sendUpdate();
+            recordAction({ type: 'group', oldValues: oldValues, groupId: commonGroupId });
+            alert(`已组合 ${state.selectedIds.length} 个图形`);
+        });
+        
+        // 分解功能
+        document.getElementById('btn-ungroup').addEventListener('click', () => {
+            if (state.selectedIds.length === 0) {
+                alert('请先选中要分解的图形');
+                return;
+            }
+            const oldValues = {};
+            let ungroupCount = 0;
+            state.selectedIds.forEach(id => {
+                const s = getShapeById(id);
+                if (s && s.groupId) { 
+                    oldValues[id] = { groupId: s.groupId }; 
+                    s.groupId = null;
+                    ungroupCount++;
+                }
+            });
+            render();
+            if (ungroupCount > 0) {
+                recordAction({ type: 'group', oldValues: oldValues });
+                alert('已分解 ' + ungroupCount + ' 个图形');
+                sendUpdate();
+            } else {
+                alert('选中的图形没有组合');
+            }
+        });
+        
+
+        
+        // 置顶功能
+        document.getElementById('btn-bring-front').addEventListener('click', () => {
+            if (state.selectedIds.length === 0) return;
+            const moved = [];
+            state.selectedIds.forEach(id => {
+                const idx = state.shapes.findIndex(s => s.id === id);
+                if (idx >= 0) {
+                    const shape = state.shapes.splice(idx, 1)[0];
+                    state.shapes.push(shape);
+                    moved.push(id);
+                }
+            });
+            if (moved.length > 0) {
+                render();
+                sendUpdate();
+                recordAction({ type: 'zIndex', ids: moved, direction: 'front' });
+            }
+        });
+
+        // 置底功能
+        document.getElementById('btn-send-back').addEventListener('click', () => {
+            if (state.selectedIds.length === 0) return;
+            const moved = [];
+            // 倒序处理，避免索引偏移
+            for (let i = state.selectedIds.length - 1; i >= 0; i--) {
+                const id = state.selectedIds[i];
+                const idx = state.shapes.findIndex(s => s.id === id);
+                if (idx >= 0) {
+                    const shape = state.shapes.splice(idx, 1)[0];
+                    state.shapes.unshift(shape);
+                    moved.push(id);
+                }
+            }
+            if (moved.length > 0) {
+                render();
+                sendUpdate();
+                recordAction({ type: 'zIndex', ids: moved, direction: 'back' });
+            }
+        });
+
+        // ===== 自定义组件 =====
+        function getCustomComponents() {
+            try { return JSON.parse(localStorage.getItem('customComponents') || '[]'); } catch(e) { return []; }
+        }
+        function saveCustomComponents(list) {
+            localStorage.setItem('customComponents', JSON.stringify(list));
+        }
+        function renderCustomComponents() {
+            const container = document.getElementById('custom-components');
+            const customs = getCustomComponents();
+            container.innerHTML = '';
+            customs.forEach((tpl, idx) => {
+                const div = document.createElement('div');
+                div.className = 'custom-item';
+                div.title = tpl.name;
+                
+                // 计算缩放以适应小图标
+                const bounds = tpl.shapes.reduce((b, s) => ({
+                    minX: Math.min(b.minX, s.x - s.width/2),
+                    maxX: Math.max(b.maxX, s.x + s.width/2),
+                    minY: Math.min(b.minY, s.y - s.height/2),
+                    maxY: Math.max(b.maxY, s.y + s.height/2)
+                }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+                
+                const bw = bounds.maxX - bounds.minX || 1;
+                const bh = bounds.maxY - bounds.minY || 1;
+                const scale = Math.min(54 / bw, 28 / bh, 1);
+                const ox = bounds.minX;
+                const oy = bounds.minY;
+                
+                let svgContent = `<svg viewBox="0 0 ${bw*scale+4} ${bh*scale+4}" xmlns="http://www.w3.org/2000/svg">`;
+                tpl.shapes.forEach(s => {
+                    const sx = (s.x - s.width/2 - ox) * scale + 2;
+                    const sy = (s.y - s.height/2 - oy) * scale + 2;
+                    const sw = s.width * scale;
+                    const sh = s.height * scale;
+                    const style = `fill:${s.fill}; stroke:${s.stroke}; stroke-width:${Math.max(1, s.strokeWidth * scale)};`;
+                    switch(s.type) {
+                        case 'dot': svgContent += `<circle cx="${sx+sw/2}" cy="${sy+sh/2}" r="${sw/2}" style="${style}"/>`; break;
+                        case 'circle': svgContent += `<ellipse cx="${sx+sw/2}" cy="${sy+sh/2}" rx="${sw/2}" ry="${sh/2}" style="${style}"/>`; break;
+                        case 'rect': svgContent += `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" style="${style}"/>`; break;
+                        case 'triangle': case 'right-triangle': svgContent += `<polygon points="${sx},${sy+sh} ${sx+sw},${sy+sh} ${sx},${sy}" style="${style}"/>`; break;
+                        case 'isosceles-triangle': svgContent += `<polygon points="${sx+sw/2},${sy} ${sx+sw},${sy+sh} ${sx},${sy+sh}" style="${style}"/>`; break;
+                        default: svgContent += `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" style="${style}"/>`;
+                    }
+                });
+                svgContent += '</svg>';
+                div.innerHTML = svgContent + `<button class="custom-delete" data-idx="${idx}">×</button>`;
+                
+                div.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('custom-delete')) return;
+                    addCustomToCanvas(tpl);
+                });
+                div.querySelector('.custom-delete').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm('删除自定义组件 "' + tpl.name + '"？')) {
+                        const list = getCustomComponents();
+                        list.splice(idx, 1);
+                        saveCustomComponents(list);
+                        renderCustomComponents();
+                    }
+                });
+                container.appendChild(div);
+            });
+        }
+        function addCustomToCanvas(tpl) {
+            if (tpl.shapes.length === 0) return;
+            // 找到画布中心
+            const cx = state.canvasWidth / 2;
+            const cy = state.canvasHeight / 2;
+            // 计算模板中心
+            const bounds = tpl.shapes.reduce((b, s) => ({
+                minX: Math.min(b.minX, s.x - s.width/2),
+                maxX: Math.max(b.maxX, s.x + s.width/2),
+                minY: Math.min(b.minY, s.y - s.height/2),
+                maxY: Math.max(b.maxY, s.y + s.height/2)
+            }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+            const tcx = (bounds.minX + bounds.maxX) / 2;
+            const tcy = (bounds.minY + bounds.maxY) / 2;
+            const dx = cx - tcx;
+            const dy = cy - tcy;
+            
+            const newIds = [];
+            tpl.shapes.forEach(s => {
+                const ns = new Shape(s.type, s.x + dx, s.y + dy, {
+                    width: s.width, height: s.height,
+                    fill: s.fill, stroke: s.stroke, strokeWidth: s.strokeWidth,
+                    rotation: s.rotation, flipH: s.flipH, flipV: s.flipV,
+                    opacity: s.opacity, strokeDasharray: s.strokeDasharray
+                });
+                state.shapes.push(ns);
+                newIds.push(ns.id);
+            });
+            state.selectedIds = newIds;
+            render();
+            sendUpdate();
+            recordAction({ type: 'add', shapes: newIds.map(id => ({...getShapeById(id)})) });
+        }
+        
+        // 收藏按钮
+        document.getElementById('btn-save-custom').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (state.selectedIds.length === 0) {
+                alert('请先选中要保存的图形');
+                return;
+            }
+            const name = prompt('为这组图形命名：', '自定义' + (getCustomComponents().length + 1));
+            if (!name) return;
+            
+            const shapesData = state.selectedIds.map(id => {
+                const s = getShapeById(id);
+                return {
+                    type: s.type, x: s.x, y: s.y,
+                    width: s.width, height: s.height,
+                    fill: s.fill, stroke: s.stroke, strokeWidth: s.strokeWidth,
+                    rotation: s.rotation, flipH: s.flipH, flipV: s.flipV,
+                    opacity: s.opacity, strokeDasharray: s.strokeDasharray
+                };
+            });
+            
+            const list = getCustomComponents();
+            list.push({ name, shapes: shapesData, created: Date.now() });
+            saveCustomComponents(list);
+            renderCustomComponents();
+            alert('已保存为自定义组件 "' + name + '"');
+        });
+        
+        // 新建功能
+        document.getElementById('btn-new').addEventListener('click', () => {
+            if (state.shapes.length > 0 && !confirm('确定清空画布？当前内容将丢失。')) return;
+            state.shapes = [];
+            state.selectedIds = [];
+            state.clipboard = [];
+            state.shapeCounter = 0;
+            render();
+            sendUpdate();
+        });
+
+        // ===== 导出功能 =====
+        document.getElementById('btn-export').addEventListener('click', () => {
+            if (state.shapes.length === 0) {
+                alert('画布为空，请先绘制图形');
+                return;
+            }
+            
+            // 生成SVG内容 - 直接使用绘图板坐标系
+            let svgContent = '';
+            state.shapes.forEach(shape => {
+                svgContent += shape.toSVG() + '\n';
+            });
+            
+            // 生成完整HTML - 800x600，与绘图板一致
+            const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>矢量图 - 导出自绘图板</title>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; }
+        svg { background: white; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+        <!-- 背景 -->
+        <rect x="0" y="0" width="800" height="600" fill="white"/>
+        
+        <!-- 图形 -->
+        ${svgContent}
+    </svg>
+</body>
+</html>`;
+            
+            // 创建下载链接
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const now = new Date();
+            const HH = String(now.getHours()).padStart(2, '0');
+            const MM = String(now.getMinutes()).padStart(2, '0');
+            a.download = '矢量图_' + HH + MM + '.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert('导出成功！文件已下载');
+        });
+        
+        // ===== 快捷键 =====
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.key === 'v' || e.key === 'V') document.getElementById('btn-select').click();
+            if (e.key === 'Delete') document.getElementById('btn-delete').click();
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+            if (e.ctrlKey && e.key === 'c') { e.preventDefault(); document.getElementById('btn-copy').click(); }
+            if (e.ctrlKey && e.key === 'v') { e.preventDefault(); document.getElementById('btn-paste').click(); }
+            if (e.key === 'Escape') { state.selectedIds = []; render(); }
+        });
+        
+        // ===== WebSocket实时协作 =====
+        let ws = null;
+        let isSyncing = false; // 防止同步循环
+        
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:9876');
+            ws.onopen = () => { 
+                document.getElementById('connection-status').className = 'connected'; 
+                console.log('WebSocket已连接，请求同步...');
+                // 连接成功后主动请求同步
+                ws.send(JSON.stringify({type: 'query'}));
+            };
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'sync') {
+                    // 收到服务器同步，更新本地状态
+                    isSyncing = true;
+                    const serverShapes = msg.data.shapes || [];
+                    // 简单同步：直接替换（实际可以用更复杂的合并策略）
+                    state.shapes = serverShapes.map(d => new Shape(d.type, d.x, d.y, d));
+                    render();
+                    isSyncing = false;
+                    console.log('同步完成，', state.shapes.length, '个图形');
+                } else if (msg.type === 'execute') {
+                    try { eval(msg.command); } catch(e) { console.error(e); }
+                }
+            };
+            ws.onclose = () => {
+                document.getElementById('connection-status').className = 'disconnected';
+                console.log('WebSocket断开，5秒后重连');
+                setTimeout(connectWebSocket, 5000);
+            };
+            ws.onerror = () => {};
+        }
+        
+        function sendUpdate() {
+            if (isSyncing) return; // 同步中不发送
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'update',
+                    data: { shapes: state.shapes.map(s => ({
+                        id: s.id, type: s.type,
+                        x: Math.round(s.x), y: Math.round(s.y),
+                        width: Math.round(s.width), height: Math.round(s.height),
+                        rotation: s.rotation, fill: s.fill, stroke: s.stroke,
+                        opacity: s.opacity, text: s.text, strokeDasharray: s.strokeDasharray,
+                        groupId: s.groupId
+                    }))}
+                }));
+                console.log('已同步', state.shapes.length, '个图形到服务器');
+            }
+        }
+        
+        // ===== API接口 =====
+        window.VectorEditor = {
+            getShapes() { return state.shapes.map(s => ({...s})); },
+            addShape(type, x, y, options = {}) {
+                const shape = new Shape(type, 
+                    state.originX + x * state.gridSize, 
+                    state.originY - y * state.gridSize, 
+                    options);
+                state.shapes.push(shape);
+                render();
+                recordAdd(shape.id);
+                sendUpdate();
+                return shape.id;
+            },
+            moveShape(id, x, y) {
+                const s = getShapeById(id);
+                if (!s) return false;
+                recordModify(id, {x: s.x, y: s.y});
+                s.x = state.originX + x * state.gridSize;
+                s.y = state.originY - y * state.gridSize;
+                render();
+                return true;
+            },
+            rotateShape(id, degrees) {
+                const s = getShapeById(id);
+                if (!s) return false;
+                recordModify(id, {rotation: s.rotation});
+                s.rotation = degrees;
+                render();
+                return true;
+            },
+            deleteShape(id) {
+                const shape = state.shapes.find(s => s.id === id);
+                if (shape) recordDelete(JSON.parse(JSON.stringify(shape)));
+                state.shapes = state.shapes.filter(s => s.id !== id);
+                state.selectedIds = state.selectedIds.filter(sid => sid !== id);
+                render();
+                return true;
+            },
+            clear() {
+                // 记录所有要删除的图形
+                state.shapes.forEach(s => recordDelete(JSON.parse(JSON.stringify(s))));
+                state.shapes = [];
+                state.selectedIds = [];
+                render();
+            },
+            getSVG() { return canvas.outerHTML; },
+            // 组合操作
+            group(ids) {
+                if (ids.length < 2) return false;
+                const oldValues = {};
+                const groupId = 'group_' + (++state.shapeCounter);
+                ids.forEach(id => {
+                    const s = getShapeById(id);
+                    if (s) { oldValues[id] = { groupId: s.groupId }; s.groupId = groupId; }
+                });
+                render();
+                recordAction({ type: 'group', oldValues: oldValues });
+                return groupId;
+            },
+            ungroup(ids) {
+                const oldValues = {};
+                ids.forEach(id => {
+                    const s = getShapeById(id);
+                    if (s) { oldValues[id] = { groupId: s.groupId }; s.groupId = null; }
+                });
+                render();
+                recordAction({ type: 'group', oldValues: oldValues });
+                return true;
+            }
+        };
+        
+        // ===== 初始化 =====
+        drawGrid();
+        renderCustomComponents();
+        render();
+        connectWebSocket();
+    </script>
+
+
+</body></html>
