@@ -8,7 +8,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -18,27 +18,17 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workflows: src-tauri
+          workspaces: src-tauri
 
       - name: Install cargo-tauri CLI
         run: cargo install tauri-cli
 
-      - name: Build Tauri app
-        run: cargo tauri build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build exe only (no installer)
+        run: cargo tauri build --bundles none
 
-      - name: List build outputs
-        run: |
-          dir src-tauri\target\release\*.exe
-          dir src-tauri\target\release\bundle\exe\*.exe
-        shell: cmd
-
-      - name: Upload Windows exe
+      - name: Upload exe
         uses: actions/upload-artifact@v4
         with:
           name: AI绘图板-windows
-          path: |
-            src-tauri/target/release/ai-drawing-board.exe
-            src-tauri/target/release/bundle/exe/*.exe
-          if-no-files-found: try
+          path: src-tauri/target/release/ai-drawing-board.exe
+          if-no-files-found: error
