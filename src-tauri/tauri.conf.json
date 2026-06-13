@@ -22,7 +22,7 @@
     },
     "bundle": {
         "active": true,
-        "targets": "all",
+        "targets": ["exe"],
         "icon": [
             "icons/icon.ico"
         ]

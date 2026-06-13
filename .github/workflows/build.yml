@@ -18,7 +18,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workflows: src-tauri
 
       - name: Install cargo-tauri CLI
         run: cargo install tauri-cli
@@ -28,9 +28,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows artifact
+      - name: List build outputs
+        run: |
+          dir src-tauri\target\release\*.exe
+          dir src-tauri\target\release\bundle\exe\*.exe
+        shell: cmd
+
+      - name: Upload Windows exe
         uses: actions/upload-artifact@v4
         with:
-          name: ai-drawing-board-windows
-          path: src-tauri/target/release/bundle/nsis/*.exe
+          name: AI绘图板-windows
+          path: |
+            src-tauri/target/release/ai-drawing-board.exe
+            src-tauri/target/release/bundle/exe/*.exe
           if-no-files-found: try
